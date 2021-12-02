@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Brief: Sample hook to be executed by isp
+# Example: sudo socat TCP-L:443,fork,reuseaddr SYSTEM:'./isp -d host -d test.me ./router'
+
+case "${1}" in
+  localhost) echo 9091;;
+  www.localhost) echo 9092;;
+  localtest.me) echo 9093;;
+  *) echo 9094;;
+esac

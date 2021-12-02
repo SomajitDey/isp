@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Brief: An Idiotic SSL Passthrough -> ISP, as in eeesp
+# Usage: socat TCP-L:PORT SYSTEM:'./isp -d <base1> -d <base2> /path/to/executable' # base is sub.dom.tld for *.sub.dom.tld
+# Executable takes on the SNI fqdn and provides a unix-socket or TCP port number to forward to
+# Dependency: socat, xxd, grep
+# Principle: Hold binary as hex. Grep domain name within binary. Read client hello length from 4th&5th bytes
+
+read_client_hello(){
+  # Brief: Reads client_hello into client_hello env var
+  local first_3="$(head -c 3 | xxd -p)" # First 3 bytes in hex
+  local length_hex="$(head -c 2 | xxd -p)" # Read length from 4-5th bytes
+  local length_dec="$((16#$length_hex))" # Transform length to decimal
+  local body="$(head -c $length_dec | xxd -p)" # Store the body as hex
+  client_hello="${first_3}${length_hex}${body}"
+}; export -f read_client_hello
+
+OPTIND=1 pattern=
+while getopts d:p: opt; do
+  case "${opt}" in
+    d) pattern="${pattern} -e '[a-z0-9\.\-]*${OPTARG,,}'";;
+  esac
+done
+
+runme="${!OPTIND}"
+
+read_client_hello
+fqdn="$(echo -n "${client_hello}" | xxd -r -p | eval "grep -UzEo ${pattern}" | tr -d '\0')"
+echo "SNI: ${fqdn}" >&2
+socket="$(${runme} "${fqdn}")"
+(echo -n "${client_hello}" | xxd -r -p; cat) | \
+  if [[ -S $socket ]]; then
+    socat STDIO UNIX-CONNECT:"${socket}"
+  else
+    socat STDIO TCP:"127.0.0.1:${socket}"
+  fi
