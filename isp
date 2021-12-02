@@ -24,7 +24,7 @@ done
 runme="${!OPTIND}"
 
 read_client_hello
-fqdn="$(echo -n "${client_hello}" | xxd -r -p | eval "grep -UzEo ${pattern}" | tr -d '\0')"
+fqdn="$(echo -n "${client_hello}" | xxd -r -p | eval "grep -UzEo -m1 ${pattern}" | tr -d '\0')"
 echo "SNI: ${fqdn}" >&2
 socket="$(${runme} "${fqdn}")"
 (echo -n "${client_hello}" | xxd -r -p; cat) | \
